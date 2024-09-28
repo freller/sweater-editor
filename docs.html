@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Suéteres</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --background-color: #f5f5f5;
+            --text-color: #333;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary-color);
+        }
+
+        .editor {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #canvas {
+            border: 2px solid var(--primary-color);
+            border-radius: 5px;
+        }
+
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button, select, input[type="file"] {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover, select:hover {
+            background-color: var(--secondary-color);
+        }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+        }
+
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
+            border-radius: 50%;
+        }
+
+        #ai-input {
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid var(--primary-color);
+            margin-right: 10px;
+        }
+
+        #modal {
+            display: none;
+            position: fixed;
+            z-index: 1;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 10px;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        #emoticonModal {
+            display: none;
+            position: fixed;
+            z-index: 2;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.4);
+        }
+
+        .emoticon-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .emoticon {
+            font-size: 24px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Editor de Suéteres</h1>
+        <div class="editor">
+            <select id="sweaterSelect">
+                <option value="">Selecciona un suéter</option>
+            </select>
+            <canvas id="canvas" width="500" height="500"></canvas>
+            <div class="controls">
+                <input type="color" id="colorPicker" value="#000000">
+                <button id="drawBtn"><i class="fas fa-pencil-alt"></i></button>
+                <button id="eraserBtn"><i class="fas fa-eraser"></i></button>
+                <button id="textBtn"><i class="fas fa-font"></i></button>
+                <button id="emoticonBtn"><i class="far fa-smile"></i></button>
+                <input type="file" id="imageUpload" accept="image/*">
+                <button id="undoBtn"><i class="fas fa-undo"></i></button>
+                <button id="buyBtn"><i class="fas fa-shopping-cart"></i> Comprar</button>
+                <input type="text" id="ai-input" placeholder="Describe lo que quieres agregar con IA">
+                <button id="aiBtn"><i class="fas fa-robot"></i> Aplicar IA</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Pasarela de Pago</h2>
+            <p>Aquí iría el formulario de pago.</p>
+            <button id="backToEditorBtn">Volver al Editor</button>
+        </div>
+    </div>
+
+    <div id="emoticonModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Selecciona un Emoticón</h2>
+            <div class="emoticon-grid" id="emoticonGrid"></div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const colorPicker = document.getElementById('colorPicker');
+        const drawBtn = document.getElementById('drawBtn');
+        const eraserBtn = document.getElementById('eraserBtn');
+        const textBtn = document.getElementById('textBtn');
+        const emoticonBtn = document.getElementById('emoticonBtn');
+        const imageUpload = document.getElementById('imageUpload');
+        const undoBtn = document.getElementById('undoBtn');
+        const buyBtn = document.getElementById('buyBtn');
+        const aiInput = document.getElementById('ai-input');
+        const aiBtn = document.getElementById('aiBtn');
+        const modal = document.getElementById('modal');
+        const emoticonModal = document.getElementById('emoticonModal');
+        const closeModal = document.getElementsByClassName('close')[0];
+        const closeEmoticonModal = document.getElementsByClassName('close')[1];
+        const backToEditorBtn = document.getElementById('backToEditorBtn');
+        const sweaterSelect = document.getElementById('sweaterSelect');
+        const emoticonGrid = document.getElementById('emoticonGrid');
+
+        let isDrawing = false;
+        let isErasing = false;
+        let selectedSweater = null;
+        let drawingHistory = [];
+
+        // Suponiendo que estas son las URL de tus imágenes en GitHub
+        const sweaters = {
+            'https://raw.githubusercontent.com/freller/sweater-editor/refs/heads/main/images/imagen1.webp?token=GHSAT0AAAAAACX7P5ERF2LDQ6SVKUMSG3RAZXYQH7A': 'Imagen1',
+            'https://raw.githubusercontent.com/freller/sweater-editor/refs/heads/main/images/imagen2.webp?token=GHSAT0AAAAAACX7P5ERNLUVDIZVX56G3PFCZXYQI6A': 'imagen2',
+            'https://raw.githubusercontent.com/freller/sweater-editor/refs/heads/main/images/imagen3.webp?token=GHSAT0AAAAAACX7P5ERM5PRVPTEJFZXG6FOZXYQJPQ': 'imagen3',
+        };
+
+        // Poblar el menú desplegable de suéteres
+        for (let [path, name] of Object.entries(sweaters)) {
+            let option = document.createElement('option');
+            option.value = path;
+            option.textContent = name;
+            sweaterSelect.appendChild(option);
+        }
+
+        sweaterSelect.addEventListener('change', (event) => {
+            selectedSweater = event.target.value;
+            loadSweaterImage(selectedSweater);
+        });
+
+        function loadSweaterImage(src) {
+            const img = new Image();
+            img.src = src;
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height); // Limpiar el canvas
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height); // Dibujar el suéter
+            };
+        }
+
+        canvas.addEventListener('mousedown', (event) => {
+            if (selectedSweater) {
+                isDrawing = true;
+                ctx.beginPath();
+                ctx.moveTo(event.offsetX, event.offsetY);
+                drawingHistory.push(ctx.getImageData(0, 0, canvas.width, canvas.height));
+            }
+        });
+
+        canvas.addEventListener('mousemove', (event) => {
+            if (isDrawing) {
+                ctx.lineTo(event.offsetX, event.offsetY);
+                ctx.strokeStyle = colorPicker.value;
+                ctx.lineWidth = 5;
+                ctx.stroke();
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isDrawing = false;
+            ctx.closePath();
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isDrawing = false;
+        });
+
+        drawBtn.addEventListener('click', () => {
+            isErasing = false;
+        });
+
+        eraserBtn.addEventListener('click', () => {
+            isErasing = true;
+            ctx.globalCompositeOperation = 'destination-out'; // Activar el modo de borrado
+        });
+
+        textBtn.addEventListener('click', () => {
+            const text = prompt("Escribe el texto que deseas agregar:");
+            if (text) {
+                ctx.fillStyle = colorPicker.value;
+                ctx.font = "30px Arial";
+                ctx.fillText(text, 50, 50);
+            }
+        });
+
+        emoticonBtn.addEventListener('click', () => {
+            emoticonModal.style.display = "block";
+            // Cargar emoticones (puedes usar emojis o imágenes)
+            const emoticons = ['😀', '😂', '😍', '🥳', '😎'];
+            emoticons.forEach(emoticon => {
+                const span = document.createElement('span');
+                span.className = 'emoticon';
+                span.textContent = emoticon;
+                span.addEventListener('click', () => {
+                    ctx.font = "30px Arial";
+                    ctx.fillText(emoticon, 100, 100); // Posición de ejemplo
+                    emoticonModal.style.display = "none";
+                });
+                emoticonGrid.appendChild(span);
+            });
+        });
+
+        closeModal.onclick = () => {
+            modal.style.display = "none";
+        };
+
+        closeEmoticonModal.onclick = () => {
+            emoticonModal.style.display = "none";
+        };
+
+        backToEditorBtn.addEventListener('click', () => {
+            modal.style.display = "none";
+        });
+
+        imageUpload.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.src = e.target.result;
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                };
+            };
+            reader.readAsDataURL(file);
+        });
+
+        undoBtn.addEventListener('click', () => {
+            if (drawingHistory.length > 0) {
+                ctx.putImageData(drawingHistory.pop(), 0, 0);
+            }
+        });
+
+        buyBtn.addEventListener('click', () => {
+            modal.style.display = "block";
+        });
+
+        aiBtn.addEventListener('click', () => {
+            const inputText = aiInput.value;
+            alert(`Aplicando IA: ${inputText}`); // Aquí puedes implementar la funcionalidad de IA
+        });
+    </script>
+</body>
+</html>
